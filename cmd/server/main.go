@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,6 +18,9 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+//go:embed web
+var webFS embed.FS
 
 // 版本信息，构建时注入
 var (
@@ -81,9 +85,9 @@ func main() {
 		zap.Int("running", mgr.RunningCount()),
 	)
 
-	// 创建 Gin 路由
+	// 创建 Gin 路由（内嵌 Web 管理界面）
 	gin.SetMode(gin.ReleaseMode)
-	router := api.NewRouter(mgr, logger)
+	router := api.NewRouter(mgr, logger, &webFS)
 
 	// 创建 HTTP 服务器
 	srv := &http.Server{

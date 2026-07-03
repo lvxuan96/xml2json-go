@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: xml2json
+  namespace: default
+  labels:
+    app: xml2json
+spec:
+  type: ClusterIP
+  selector:
+    app: xml2json
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP

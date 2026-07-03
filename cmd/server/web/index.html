@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XML2JSON Converter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
+.header{background:#1a1a2e;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:20px;font-weight:600}
+.header .status{display:flex;align-items:center;gap:8px;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.green{background:#4ade80}
+.dot.red{background:#f87171}
+.layout{display:flex;height:calc(100vh - 48px)}
+.sidebar{width:300px;background:#fff;border-right:1px solid #e5e7eb;overflow-y:auto;padding:16px}
+.sidebar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.sidebar-header h2{font-size:16px}.btn{padding:6px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.15s}
+.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-success{background:#10b981;color:#fff}.btn-success:hover{background:#059669}
+.btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+.btn-warning{background:#f59e0b;color:#fff}.btn-warning:hover{background:#d97706}
+.btn-sm{padding:4px 10px;font-size:12px}.btn-xs{padding:2px 8px;font-size:11px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+.pipeline-item{padding:12px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all 0.15s}
+.pipeline-item:hover{border-color:#3b82f6;box-shadow:0 1px 4px rgba(59,130,246,0.15)}
+.pipeline-item.active{border-color:#3b82f6;background:#eff6ff}
+.pipeline-item .name{font-weight:600;font-size:14px;margin-bottom:4px}
+.pipeline-item .meta{font-size:11px;color:#6b7280}
+.pipeline-item .state-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.state-running{background:#d1fae5;color:#065f46}
+.state-idle{background:#f3f4f6;color:#6b7280}
+.state-error{background:#fee2e2;color:#991b1b}
+.main{flex:1;overflow-y:auto;padding:24px}
+.empty-state{text-align:center;padding:80px 20px;color:#9ca3af}
+.empty-state .icon{font-size:64px;margin-bottom:16px}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:20px}
+.card-header{padding:16px 20px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center}
+.card-header h3{font-size:15px;font-weight:600}
+.card-body{padding:20px}
+.form-row{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.form-group{flex:1;min-width:200px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;text-transform:uppercase}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;transition:border-color 0.15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.1)}
+.form-group textarea{font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;resize:vertical;min-height:120px}
+.tabs{display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:20px}
+.tab{padding:10px 20px;cursor:pointer;font-size:13px;font-weight:500;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s}
+.tab:hover{color:#374151}
+.tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.metric{background:#f9fafb;padding:16px;border-radius:8px;text-align:center}
+.metric .value{font-size:28px;font-weight:700;color:#1a1a2e}
+.metric .label{font-size:11px;color:#6b7280;margin-top:4px;text-transform:uppercase}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;justify-content:center;align-items:center;z-index:1000}
+.modal{background:#fff;border-radius:12px;width:700px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.modal-header{padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center}
+.modal-header h3{font-size:16px}
+.modal-body{padding:20px}
+.modal-footer{padding:16px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px}
+.close-btn{background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;padding:0 4px}
+.close-btn:hover{color:#374151}
+.preview-container{display:flex;gap:16px}
+.preview-panel{flex:1}
+.preview-panel h4{font-size:13px;color:#6b7280;margin-bottom:8px}
+.preview-panel textarea{width:100%;font-family:'Cascadia Code','Fira Code',monospace;font-size:12px;min-height:200px;padding:12px;border:1px solid #d1d5db;border-radius:8px;resize:vertical}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:13px;z-index:2000;animation:slideIn 0.3s ease}
+.toast.success{background:#10b981}.toast.error{background:#ef4444}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.hidden{display:none!important}
+.collapsible{cursor:pointer}
+.collapsible-content{display:none;margin-top:12px}
+.collapsible-content.open{display:block}
+.arrow{transition:transform 0.2s;display:inline-block}
+.arrow.open{transform:rotate(90deg)}
+code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>XML2JSON Converter</h1>
+  <div class="status">
+    <span>服务器:</span><span class="dot" id="healthDot"></span>
+    <span id="healthText">检查中...</span>
+    <span style="margin-left:16px">管道:</span>
+    <strong id="headerRunning">0</strong>运行 /
+    <strong id="headerTotal">0</strong>总数
+  </div>
+</div>
+
+<div class="layout">
+  <!-- 左侧管道列表 -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>管道列表</h2>
+      <button class="btn btn-primary btn-sm" onclick="showCreateModal()">+ 新建</button>
+    </div>
+    <div id="pipelineList"></div>
+  </div>
+
+  <!-- 右侧主内容 -->
+  <div class="main" id="mainContent">
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <p style="font-size:16px;margin-bottom:8px">选择左侧管道查看详情</p>
+      <p style="font-size:13px">或点击"+ 新建"创建管道</p>
+      <div id="previewSection" style="margin-top:40px;text-align:left"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 新建/编辑弹窗 -->
+<div class="modal-overlay hidden" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">新建管道</h3>
+      <button class="close-btn" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <div class="tab active" data-tab="basic">基本信息</div>
+        <div class="tab" data-tab="source">数据源</div>
+        <div class="tab" data-tab="transform">转换规则</div>
+        <div class="tab" data-tab="sink">数据输出</div>
+      </div>
+      <form id="pipelineForm">
+        <input type="hidden" id="editId">
+        <div id="tab-basic">
+          <div class="form-row">
+            <div class="form-group"><label>管道 ID *</label><input id="pid" placeholder="例如 order-pipeline" required></div>
+            <div class="form-group"><label>管道名称</label><input id="pname" placeholder="例如 订单数据转换"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>描述</label><input id="pdesc" placeholder="描述此管道的用途"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Worker 数量</label><input id="pworkers" type="number" value="4" min="1" max="64"></div>
+            <div class="form-group"><label>缓冲大小</label><input id="pbuffer" type="number" value="1024" min="64"></div>
+          </div>
+        </div>
+        <div id="tab-source" class="hidden">
+          <div class="form-row">
+            <div class="form-group"><label>Broker 地址 (逗号分隔)</label><input id="sbrokers" value="localhost:9092" placeholder="host1:9092,host2:9092"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Topic (逗号分隔)</label><input id="stopics" placeholder="test-xml"></div>
+            <div class="form-group"><label>Consumer Group ID</label><input id="sgroup" placeholder="xml2json-group"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Offset 策略</label><select id="soffset"><option value="earliest">earliest</option><option value="latest" selected>latest</option></select></div>
+            <div class="form-group"><label>Max Poll Records</label><input id="smaxpoll" type="number" value="500"></div>
+          </div>
+        </div>
+        <div id="tab-transform" class="hidden">
+          <div class="form-row">
+            <div class="form-group"><label>属性前缀</label><input id="tprefix" value="@"></div>
+            <div class="form-group"><label>文本 Key</label><input id="ttext" value="#text"></div>
+            <div class="form-group"><label>命名空间</label><select id="tns"><option value="strip" selected>strip</option><option value="keep">keep</option><option value="expand">expand</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>跳过层级 (stripLevels)</label><input id="tstrip" type="number" value="0" min="0"></div>
+            <div class="form-group"><label>严格模式</label><select id="tstrict"><option value="false" selected>关闭</option><option value="true">开启</option></select></div>
+          </div>
+        </div>
+        <div id="tab-sink" class="hidden">
+          <div class="form-row">
+            <div class="form-group"><label>Broker 地址</label><input id="kbrokers" value="localhost:9092"></div>
+            <div class="form-group"><label>输出 Topic</label><input id="ktopic" placeholder="output-json"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>ACK 策略</label><select id="kacks"><option value="1" selected>1 (Leader)</option><option value="0">0 (无确认)</option><option value="-1">-1 (全部副本)</option></select></div>
+            <div class="form-group"><label>压缩</label><select id="kcomp"><option value="none" selected>none</option><option value="gzip">gzip</option><option value="snappy">snappy</option><option value="lz4">lz4</option><option value="zstd">zstd</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>分区策略</label><select id="kpart"><option value="hash" selected>hash</option><option value="roundRobin">roundRobin</option><option value="random">random</option></select></div>
+            <div class="form-group"><label>重试次数</label><input id="kretries" type="number" value="3" min="0"></div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="savePipeline()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1';
+
+// ---- 初始化 ----
+async function init() {
+  checkHealth();
+  refreshList();
+  setInterval(checkHealth, 30000);
+}
+init();
+
+// ---- 健康检查 ----
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    document.getElementById('healthDot').className = 'dot green';
+    document.getElementById('healthText').textContent = `正常 (${d.data?.uptime || '?'})`;
+  } catch(e) {
+    document.getElementById('healthDot').className = 'dot red';
+    document.getElementById('healthText').textContent = '异常';
+  }
+}
+
+// ---- 管道列表 ----
+async function refreshList() {
+  try {
+    const r = await fetch(`${API}/pipelines`);
+    const d = await r.json();
+    const list = d.data?.pipelines || [];
+    document.getElementById('headerTotal').textContent = d.data?.total || 0;
+    document.getElementById('headerRunning').textContent = d.data?.running || 0;
+
+    const container = document.getElementById('pipelineList');
+    if (list.length === 0) {
+      container.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:40px 0">暂无管道<br/>点击"+ 新建"创建</p>';
+      return;
+    }
+
+    container.innerHTML = list.map(p => {
+      const stateClass = p.state === 'running' ? 'state-running' : p.state === 'error' ? 'state-error' : 'state-idle';
+      const m = p.metrics || {};
+      const rate = p.state === 'running' && m.upTime > 0
+        ? Math.round(m.consumed / (m.upTime / 1e9)) : 0;
+      return `
+      <div class="pipeline-item" id="item-${p.config.id}" onclick="selectPipeline('${p.config.id}')">
+        <div class="name">${p.config.name || p.config.id}</div>
+        <div class="meta">
+          <span class="state-badge ${stateClass}">${p.state}</span>
+          &nbsp;${p.config.source?.topics?.[0] || '?'} → ${p.config.sink?.topic || '?'}
+        </div>
+        <div class="meta" style="margin-top:4px">
+          已消费: ${m.consumed || 0} | 已生产: ${m.produced || 0} | 速率: ${rate}/s
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('refreshList error', e);
+  }
+}
+
+// ---- 选择管道（查看详情） ----
+async function selectPipeline(id) {
+  document.querySelectorAll('.pipeline-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('item-' + id)?.classList.add('active');
+
+  try {
+    const r = await fetch(`${API}/pipelines/${id}`);
+    const d = await r.json();
+    if (d.code !== 0) { toast(d.message, 'error'); return; }
+    const p = d.data;
+    const cfg = p.config;
+    const m = p.metrics || {};
+    const stateClass = p.state === 'running' ? 'state-running' : p.state === 'error' ? 'state-error' : 'state-idle';
+
+    const rate = p.state === 'running' && m.upTime > 0
+      ? Math.round(m.consumed / (m.upTime / 1e9)) : 0;
+
+    document.getElementById('mainContent').innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <h3>${cfg.name || cfg.id}</h3>
+          <div class="btn-group">
+            ${p.state === 'running'
+              ? `<button class="btn btn-warning btn-sm" onclick="stopPipeline('${id}')">⏸ 停止</button>`
+              : `<button class="btn btn-success btn-sm" onclick="startPipeline('${id}')">▶ 启动</button>`}
+            <button class="btn btn-primary btn-sm" onclick="showEditModal('${id}')">✎ 编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePipeline('${id}')">✕ 删除</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="metrics-grid">
+            <div class="metric"><div class="value"><span class="state-badge ${stateClass}">${p.state}</span></div><div class="label">状态</div></div>
+            <div class="metric"><div class="value">${m.consumed || 0}</div><div class="label">已消费</div></div>
+            <div class="metric"><div class="value">${m.produced || 0}</div><div class="label">已生产</div></div>
+            <div class="metric"><div class="value">${m.errors || 0}</div><div class="label">错误</div></div>
+            <div class="metric"><div class="value">${rate}</div><div class="label">速率 (msg/s)</div></div>
+            <div class="metric"><div class="value">${formatDuration(m.upTime)}</div><div class="label">运行时长</div></div>
+          </div>
+
+          <div class="collapsible" onclick="toggleSection(this)">
+            <span class="arrow">▶</span> <strong>消费配置</strong>
+          </div>
+          <div class="collapsible-content">
+            <p style="font-size:13px;line-height:2">
+              Brokers: <code>${(cfg.source?.brokers || []).join(', ')}</code><br/>
+              Topics: <code>${(cfg.source?.topics || []).join(', ')}</code><br/>
+              Group ID: <code>${cfg.source?.groupId || '-'}</code><br/>
+              Offset: <code>${cfg.source?.autoOffsetReset || '-'}</code>
+              &nbsp; MaxPoll: <code>${cfg.source?.maxPollRecords || '-'}</code>
+            </p>
+          </div>
+
+          <div class="collapsible" onclick="toggleSection(this)" style="margin-top:12px">
+            <span class="arrow">▶</span> <strong>转换配置</strong>
+          </div>
+          <div class="collapsible-content">
+            <p style="font-size:13px;line-height:2">
+              属性前缀: <code>${cfg.transform?.attributePrefix || '@'}</code><br/>
+              文本 Key: <code>${cfg.transform?.textKey || '#text'}</code><br/>
+              命名空间: <code>${cfg.transform?.namespaceMode || 'strip'}</code><br/>
+              跳过层级: <code>${cfg.transform?.stripLevels || 0}</code>
+              &nbsp; 严格模式: <code>${cfg.transform?.strictMode || false}</code>
+            </p>
+          </div>
+
+          <div class="collapsible" onclick="toggleSection(this)" style="margin-top:12px">
+            <span class="arrow">▶</span> <strong>生产配置</strong>
+          </div>
+          <div class="collapsible-content">
+            <p style="font-size:13px;line-height:2">
+              Brokers: <code>${(cfg.sink?.brokers || []).join(', ')}</code><br/>
+              Topic: <code>${cfg.sink?.topic || '-'}</code><br/>
+              ACK: <code>${cfg.sink?.acks || 1}</code>
+              &nbsp; 压缩: <code>${cfg.sink?.compression || 'none'}</code><br/>
+              分区策略: <code>${cfg.sink?.partitioner || 'hash'}</code>
+              &nbsp; 重试: <code>${cfg.sink?.maxRetries || 0}</code>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- XML→JSON 预览 -->
+      <div class="card">
+        <div class="card-header"><h3>XML → JSON 预览测试</h3></div>
+        <div class="card-body">
+          <div class="preview-container">
+            <div class="preview-panel">
+              <h4>输入 XML</h4>
+              <textarea id="previewXml" placeholder='<order id="12345"><item>测试</item></order>'></textarea>
+            </div>
+            <div class="preview-panel">
+              <h4>输出 JSON</h4>
+              <textarea id="previewJson" readonly placeholder="转换结果将显示在这里..."></textarea>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary" onclick="doPreview()">▶ 执行转换</button>
+            <label style="font-size:12px">StripLevels:</label>
+            <input id="previewStrip" type="number" value="${cfg.transform?.stripLevels || 0}" min="0" max="10" style="width:60px;padding:4px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:12px">
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    toast('加载管道详情失败: ' + e.message, 'error');
+  }
+}
+
+function toggleSection(el) {
+  const content = el.nextElementSibling;
+  const arrow = el.querySelector('.arrow');
+  content.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+// ---- 预览转换 ----
+async function doPreview() {
+  const xml = document.getElementById('previewXml').value.trim();
+  if (!xml) { toast('请输入 XML', 'error'); return; }
+  const stripLevels = parseInt(document.getElementById('previewStrip').value) || 0;
+
+  try {
+    const r = await fetch(`${API}/preview`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({xml, options: {stripLevels}})
+    });
+    const d = await r.json();
+    if (d.code === 0) {
+      document.getElementById('previewJson').value = JSON.stringify(d.data, null, 2);
+    } else {
+      document.getElementById('previewJson').value = '错误: ' + (d.error || d.message);
+    }
+  } catch(e) {
+    document.getElementById('previewJson').value = '请求失败: ' + e.message;
+  }
+}
+
+// ---- 管道操作 ----
+async function startPipeline(id) { await fetch(`${API}/pipelines/${id}/start`, {method:'POST'}); refreshList(); selectPipeline(id); }
+async function stopPipeline(id) { await fetch(`${API}/pipelines/${id}/stop`, {method:'POST'}); refreshList(); selectPipeline(id); }
+async function deletePipeline(id) {
+  if (!confirm('确定删除管道 ' + id + '？')) return;
+  const r = await fetch(`${API}/pipelines/${id}`, {method:'DELETE'});
+  const d = await r.json();
+  if (d.code === 0) {
+    toast('已删除');
+    refreshList();
+    document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>选择左侧管道查看详情</p></div>';
+  } else { toast(d.message, 'error'); }
+}
+
+// ---- 新建/编辑弹窗 ----
+function showCreateModal() {
+  document.getElementById('modalTitle').textContent = '新建管道';
+  document.getElementById('editId').value = '';
+  resetForm();
+  document.getElementById('modal').classList.remove('hidden');
+  switchTab('basic');
+}
+
+function showEditModal(id) {
+  fetch(`${API}/pipelines/${id}`).then(r=>r.json()).then(d=>{
+    if (d.code !== 0) { toast(d.message,'error'); return; }
+    const c = d.data.config;
+    document.getElementById('modalTitle').textContent = '编辑: ' + id;
+    document.getElementById('editId').value = id;
+    document.getElementById('pid').value = c.id;
+    document.getElementById('pname').value = c.name || '';
+    document.getElementById('pdesc').value = c.description || '';
+    document.getElementById('pworkers').value = c.workers || 4;
+    document.getElementById('pbuffer').value = c.bufferSize || 1024;
+    document.getElementById('sbrokers').value = (c.source?.brokers || []).join(',');
+    document.getElementById('stopics').value = (c.source?.topics || []).join(',');
+    document.getElementById('sgroup').value = c.source?.groupId || '';
+    document.getElementById('soffset').value = c.source?.autoOffsetReset || 'latest';
+    document.getElementById('smaxpoll').value = c.source?.maxPollRecords || 500;
+    document.getElementById('tprefix').value = c.transform?.attributePrefix || '@';
+    document.getElementById('ttext').value = c.transform?.textKey || '#text';
+    document.getElementById('tns').value = c.transform?.namespaceMode || 'strip';
+    document.getElementById('tstrip').value = c.transform?.stripLevels || 0;
+    document.getElementById('tstrict').value = String(c.transform?.strictMode || false);
+    document.getElementById('kbrokers').value = (c.sink?.brokers || []).join(',');
+    document.getElementById('ktopic').value = c.sink?.topic || '';
+    document.getElementById('kacks').value = c.sink?.acks ?? 1;
+    document.getElementById('kcomp').value = c.sink?.compression || 'none';
+    document.getElementById('kpart').value = c.sink?.partitioner || 'hash';
+    document.getElementById('kretries').value = c.sink?.maxRetries || 3;
+    document.getElementById('modal').classList.remove('hidden');
+    switchTab('basic');
+  }).catch(e => toast('加载失败: '+e.message, 'error'));
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+function resetForm() {
+  document.getElementById('pid').value = '';
+  document.getElementById('pname').value = '';
+  document.getElementById('pdesc').value = '';
+  document.getElementById('pworkers').value = '4';
+  document.getElementById('pbuffer').value = '1024';
+  document.getElementById('sbrokers').value = 'localhost:9092';
+  document.getElementById('stopics').value = '';
+  document.getElementById('sgroup').value = '';
+  document.getElementById('soffset').value = 'latest';
+  document.getElementById('smaxpoll').value = '500';
+  document.getElementById('tprefix').value = '@';
+  document.getElementById('ttext').value = '#text';
+  document.getElementById('tns').value = 'strip';
+  document.getElementById('tstrip').value = '0';
+  document.getElementById('tstrict').value = 'false';
+  document.getElementById('kbrokers').value = 'localhost:9092';
+  document.getElementById('ktopic').value = '';
+  document.getElementById('kacks').value = '1';
+  document.getElementById('kcomp').value = 'none';
+  document.getElementById('kpart').value = 'hash';
+  document.getElementById('kretries').value = '3';
+}
+
+// Tab 切换
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+});
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  ['basic','source','transform','sink'].forEach(n => {
+    document.getElementById('tab-'+n).classList.toggle('hidden', n !== name);
+  });
+}
+
+// ---- 保存管道 ----
+async function savePipeline() {
+  const editId = document.getElementById('editId').value;
+  const id = document.getElementById('pid').value.trim();
+  if (!id) { toast('管道 ID 不能为空', 'error'); return; }
+
+  const body = {
+    id,
+    name: document.getElementById('pname').value,
+    description: document.getElementById('pdesc').value,
+    workers: parseInt(document.getElementById('pworkers').value) || 4,
+    bufferSize: parseInt(document.getElementById('pbuffer').value) || 1024,
+    source: {
+      brokers: document.getElementById('sbrokers').value.split(',').map(s=>s.trim()).filter(Boolean),
+      topics: document.getElementById('stopics').value.split(',').map(s=>s.trim()).filter(Boolean),
+      groupId: document.getElementById('sgroup').value,
+      autoOffsetReset: document.getElementById('soffset').value,
+      maxPollRecords: parseInt(document.getElementById('smaxpoll').value) || 500,
+      enableAutoCommit: true,
+      commitInterval: '5s',
+      sessionTimeout: '10s',
+      heartbeatInterval: '3s'
+    },
+    transform: {
+      attributePrefix: document.getElementById('tprefix').value,
+      textKey: document.getElementById('ttext').value,
+      namespaceMode: document.getElementById('tns').value,
+      stripLevels: parseInt(document.getElementById('tstrip').value) || 0,
+      strictMode: document.getElementById('tstrict').value === 'true',
+      trimElements: true,
+      skipComments: true,
+      skipProcInst: true
+    },
+    sink: {
+      brokers: document.getElementById('kbrokers').value.split(',').map(s=>s.trim()).filter(Boolean),
+      topic: document.getElementById('ktopic').value,
+      acks: parseInt(document.getElementById('kacks').value),
+      compression: document.getElementById('kcomp').value,
+      partitioner: document.getElementById('kpart').value,
+      maxRetries: parseInt(document.getElementById('kretries').value) || 3,
+      batchSize: 16384,
+      lingerMs: 10,
+      maxInFlightRequests: 5,
+      retryBackoff: '100ms'
+    }
+  };
+
+  const method = editId ? 'PUT' : 'POST';
+  const url = editId ? `${API}/pipelines/${editId}` : `${API}/pipelines`;
+
+  try {
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    if (d.code === 0) {
+      toast(editId ? '管道已更新' : '管道已创建', 'success');
+      closeModal();
+      refreshList();
+      if (!editId) {
+        document.getElementById('mainContent').innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>管道创建成功！选择左侧管道查看详情并启动</p></div>';
+      } else {
+        selectPipeline(id);
+      }
+    } else {
+      toast(d.message || d.error, 'error');
+    }
+  } catch(e) {
+    toast('请求失败: ' + e.message, 'error');
+  }
+}
+
+// ---- Toast ----
+function toast(msg, type) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type || 'success');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ---- 辅助 ----
+function formatDuration(ns) {
+  if (!ns || ns === 0) return '0s';
+  const s = Math.floor(ns / 1e9);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s/60)+'m '+ (s%60)+'s';
+  return Math.floor(s/3600)+'h '+ Math.floor((s%3600)/60)+'m';
+}
+</script>
+</body>
+</html>

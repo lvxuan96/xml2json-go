@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xml2json
+  namespace: default
+  labels:
+    app: xml2json
+spec:
+  replicas: 2                          # 多副本，Kafka 消费者组自动负载均衡
+  selector:
+    matchLabels:
+      app: xml2json
+  template:
+    metadata:
+      labels:
+        app: xml2json
+    spec:
+      containers:
+      - name: xml2json
+        image: your-registry.internal/xml2json-go:latest   # 替换为实际镜像地址
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "128Mi"
+          limits:
+            cpu: "2"
+            memory: "512Mi"
+        volumeMounts:
+        - name: config
+          mountPath: /app/configs
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: GOMAXPROCS
+          value: "2"
+      volumes:
+      - name: config
+        configMap:
+          name: xml2json-config
+      restartPolicy: Always

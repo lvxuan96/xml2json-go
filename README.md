@@ -31,12 +31,21 @@ vim configs/config.yaml
 # 启动服务
 go run ./cmd/server --config configs/config.yaml
 
+# 浏览器打开管理界面
+# http://localhost:8080
+
 # 或编译后运行
 go build -o bin/xml2json ./cmd/server
 ./bin/xml2json --config configs/config.yaml
 ```
 
-### 管理管道
+启动后浏览器访问 `http://localhost:8080` 即可使用 **Web 管理界面**：
+- 左侧管道列表（创建、查看、编辑、删除）
+- 管道详情面板（状态、指标、配置查看）
+- XML → JSON 实时预览测试
+- 管道启停控制
+
+### 管理管道（API）
 
 ```bash
 # 查看所有管道

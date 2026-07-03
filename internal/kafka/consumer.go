@@ -57,13 +57,13 @@ func NewConsumer(
 	if cfg.AutoOffsetReset == "latest" {
 		saramaCfg.Consumer.Offsets.Initial = sarama.OffsetNewest
 	}
-	saramaCfg.Consumer.Group.Session.Timeout = cfg.SessionTimeout
-	saramaCfg.Consumer.Group.Heartbeat.Interval = cfg.HeartbeatInterval
+	saramaCfg.Consumer.Group.Session.Timeout = time.Duration(cfg.SessionTimeout)
+	saramaCfg.Consumer.Group.Heartbeat.Interval = time.Duration(cfg.HeartbeatInterval)
 	saramaCfg.Consumer.MaxProcessingTime = 30 * time.Second
 
 	// 自动提交 offset
 	saramaCfg.Consumer.Offsets.AutoCommit.Enable = cfg.EnableAutoCommit
-	saramaCfg.Consumer.Offsets.AutoCommit.Interval = cfg.CommitInterval
+	saramaCfg.Consumer.Offsets.AutoCommit.Interval = time.Duration(cfg.CommitInterval)
 
 	// 拉取配置
 	// 注意：MaxProcessingTime 是消费会话的最大处理时间，如果太短会触发 rebalance 导致消息重复
@@ -75,8 +75,8 @@ func NewConsumer(
 	if cfg.FetchMaxBytes > 0 {
 		saramaCfg.Consumer.Fetch.Default = cfg.FetchMaxBytes
 	}
-	if cfg.FetchMaxWait > 0 {
-		saramaCfg.Consumer.MaxWaitTime = cfg.FetchMaxWait
+	if cfg.FetchMaxWait.ToStd() > 0 {
+		saramaCfg.Consumer.MaxWaitTime = time.Duration(cfg.FetchMaxWait)
 	}
 
 	// SASL 配置

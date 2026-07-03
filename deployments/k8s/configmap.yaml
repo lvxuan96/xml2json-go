@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xml2json-config
+  namespace: default
+data:
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      readTimeout: 30s
+      writeTimeout: 30s
+
+    pipelines:
+      - id: "order-pipeline"
+        name: "订单数据转换"
+        description: "消费订单XML，转为JSON输出"
+        enabled: true
+        workers: 4
+        bufferSize: 1024
+        source:
+          brokers:
+            - "kafka-broker.default:9092"    # 改为实际 Kafka 地址
+          topics:
+            - "test-xml"
+          groupId: "xml2json-order-group"
+          autoOffsetReset: "earliest"
+          enableAutoCommit: true
+          commitInterval: 5s
+          sessionTimeout: 10s
+          heartbeatInterval: 3s
+          maxPollRecords: 500
+        transform:
+          attributePrefix: "@"
+          textKey: "#text"
+          cdataKey: "#cdata"
+          namespaceMode: "strip"
+          trimElements: true
+          skipComments: true
+          skipProcInst: true
+          strictMode: false
+          stripLevels: 2
+        sink:
+          brokers:
+            - "kafka-broker.default:9092"
+          topic: "test-json"
+          acks: 1
+          compression: "zstd"
+          batchSize: 16384
+          lingerMs: 10
+          maxInFlightRequests: 5
+          idempotent: false
+          maxRetries: 3
+          retryBackoff: 100ms
+          partitioner: "hash"

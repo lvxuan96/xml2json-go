@@ -44,8 +44,8 @@ func NewProducer(cfg *config.KafkaProducerConfig, logger *zap.Logger) (*Producer
 	if cfg.MaxRetries > 0 {
 		saramaCfg.Producer.Retry.Max = cfg.MaxRetries
 	}
-	if cfg.RetryBackoff > 0 {
-		saramaCfg.Producer.Retry.Backoff = cfg.RetryBackoff
+	if cfg.RetryBackoff.ToStd() > 0 {
+		saramaCfg.Producer.Retry.Backoff = time.Duration(cfg.RetryBackoff)
 	}
 
 	// 批量发送配置

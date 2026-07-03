@@ -1,1 +1,3 @@
 internal\converter\xml2json_test.go
+images/
+.claude/
