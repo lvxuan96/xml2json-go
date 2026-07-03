@@ -259,3 +259,22 @@ func preprocessXML(data []byte) []byte {
 	})
 	return data
 }
+
+// StandalonePreview 独立预览函数，不需要管道实例
+// opts 为 nil 时使用默认配置
+func StandalonePreview(xmlData []byte, opts *config.TransformConfig) (map[string]interface{}, error) {
+	if opts == nil {
+		opts = &config.TransformConfig{
+			AttributePrefix: "@",
+			TextKey:         "#text",
+			CDataKey:        "#cdata",
+			NamespaceMode:   "strip",
+			TrimElements:    true,
+			SkipComments:    true,
+			SkipProcInst:    true,
+			StripLevels:     0,
+		}
+	}
+	c := New(opts, nil)
+	return c.Preview(xmlData)
+}

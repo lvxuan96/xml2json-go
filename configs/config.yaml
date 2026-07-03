@@ -1,4 +1,5 @@
-# xml2json-go 配置文件
+# xml2json-go 配置文件 v0.2
+# 支持多管道并行运行
 # 环境变量覆盖: 如 SERVER_PORT=9090 可覆盖 server.port
 
 server:
@@ -7,58 +8,85 @@ server:
   readTimeout: 30s
   writeTimeout: 30s
 
-# 单管道配置
-pipeline:
-  id: "default"
-  name: "默认转换管道"
-  description: "消费XML消息，转为JSON后投递"
-  enabled: false      # 启动时是否自动开启管道
-  workers: 4          # 转换 worker 协程数
-  bufferSize: 1024    # 工作通道缓冲区大小
+# 多管道配置列表（可配置任意数量的管道）
+pipelines:
+  - id: "order-pipeline"
+    name: "订单数据转换"
+    description: "消费订单XML，转为JSON输出"
+    enabled: false          # 启动时是否自动运行
+    workers: 4
+    bufferSize: 1024
 
-  # === Kafka 消费端配置 ===
-  source:
-    brokers:
-      - "localhost:9092"
-    topics:
-      - "test-xml"
-    # topicPattern: "xml\..*"   # 也可用正则匹配 topic
-    groupId: "xml2json-group"
-    autoOffsetReset: "earliest"   # earliest | latest
-    enableAutoCommit: true
-    commitInterval: 5s
-    sessionTimeout: 10s
-    heartbeatInterval: 3s
-    maxPollRecords: 500
-    fetchMinBytes: 1
-    fetchMaxBytes: 10485760    # 10MB
-    fetchMaxWait: 5s
+    source:                 # === Kafka 消费端 ===
+      brokers:
+        - "localhost:9092"
+      topics:
+        - "test-xml"
+      groupId: "xml2json-order-group"
+      autoOffsetReset: "earliest"
+      enableAutoCommit: true
+      commitInterval: 5s
+      sessionTimeout: 10s
+      heartbeatInterval: 3s
+      maxPollRecords: 500
+      fetchMinBytes: 1
+      fetchMaxBytes: 10485760
+      fetchMaxWait: 5s
 
-  # === XML→JSON 转换配置 ===
-  transform:
-    attributePrefix: "@"       # XML 属性前缀
-    textKey: "#text"            # XML 文本节点 key
-    cdataKey: "#cdata"         # CDATA 节点 key
-    namespaceMode: "strip"     # keep | strip | expand
-    trimElements: true
-    skipComments: true
-    skipProcInst: true
-    strictMode: false          # 严格模式: XML 格式错误时丢弃消息
-    errorTopic: ""             # 错误消息投递 topic（空=不投递）
-    stripLevels: 2             # 跳过外层包装层级数: <ROWSET><ROW> 设2则从ROW内部开始转换
+    transform:              # === 转换规则 ===
+      attributePrefix: "@"
+      textKey: "#text"
+      cdataKey: "#cdata"
+      namespaceMode: "strip"
+      trimElements: true
+      skipComments: true
+      skipProcInst: true
+      strictMode: false
+      errorTopic: ""
+      stripLevels: 2         # 跳过 <ROWSET><ROW> 外层
 
-  # === Kafka 生产端配置 ===
-  sink:
-    brokers:
-      - "localhost:9092"
-    topic: "test-json"
-    acks: 1                   # 0=不等待 | 1=Leader确认 | -1=所有副本确认
-    compression: "none"        # none | gzip | snappy | lz4 | zstd
-    batchSize: 16384           # 批量发送字节数
-    lingerMs: 10               # 批量等待时间(ms)
-    maxInFlightRequests: 5
-    idempotent: false
-    maxRetries: 3
-    retryBackoff: 100ms
-    partitioner: "hash"        # hash | roundRobin | random
-    partitionKeyField: ""      # JSON中用作分区 key 的字段路径
+    sink:                   # === Kafka 生产端 ===
+      brokers:
+        - "localhost:9092"
+      topic: "test-json"
+      acks: 1
+      compression: "none"
+      batchSize: 16384
+      lingerMs: 10
+      maxInFlightRequests: 5
+      idempotent: false
+      maxRetries: 3
+      retryBackoff: 100ms
+      partitioner: "hash"
+      partitionKeyField: ""
+
+  # 示例：第二条管道（取消注释即可启用）
+  - id: "user-pipeline"
+    name: "用户数据转换"
+    description: "消费用户XML，转为JSON输出"
+    enabled: false
+    workers: 4
+    bufferSize: 1024
+    source:
+      brokers:
+        - "localhost:9092"
+      topics:
+        - "user-xml"
+      groupId: "xml2json-user-group"
+      autoOffsetReset: "latest"
+      enableAutoCommit: true
+      commitInterval: 5s
+      sessionTimeout: 10s
+      heartbeatInterval: 3s
+      maxPollRecords: 500
+    transform:
+      attributePrefix: "@"
+      textKey: "#text"
+      namespaceMode: "strip"
+      stripLevels: 0
+    sink:
+      brokers:
+        - "localhost:9092"
+      topic: "user-json"
+      acks: 1
+      compression: "zstd"

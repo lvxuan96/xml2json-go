@@ -109,8 +109,8 @@ type PipelineCfg struct {
 
 // AppConfig 应用总配置
 type AppConfig struct {
-	Server   ServerConfig `mapstructure:"server"`
-	Pipeline PipelineCfg  `mapstructure:"pipeline"`
+	Server    ServerConfig  `mapstructure:"server"`
+	Pipelines []PipelineCfg `mapstructure:"pipelines"`
 }
 
 // DefaultConfig 返回带默认值的配置
@@ -122,40 +122,43 @@ func DefaultConfig() *AppConfig {
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 		},
-		Pipeline: PipelineCfg{
-			ID:      "default",
-			Name:    "默认管道",
-			Enabled: false,
-			Workers: 4,
-			BufferSize: 1024,
-			Source: KafkaConsumerConfig{
-				GroupID:         "xml2json-group",
-				AutoOffsetReset: "latest",
-				MaxPollRecords:  500,
-				FetchMinBytes:   1,
-				FetchMaxBytes:   10 * 1024 * 1024,
-				FetchMaxWait:    5 * time.Second,
-			},
-			Transform: TransformConfig{
-				AttributePrefix: "@",
-				TextKey:         "#text",
-				CDataKey:        "#cdata",
-				NamespaceMode:   "strip",
-				TrimElements:    true,
-				SkipComments:    true,
-				SkipProcInst:    true,
-				StripLevels:     0, // 默认不跳过，完整转换
-			},
-			Sink: KafkaProducerConfig{
-				Acks:                1,
-				Compression:         "none",
-				BatchSize:           16384,
-				LingerMs:            10,
-				MaxInFlightRequests: 5,
-				MaxRetries:          3,
-				RetryBackoff:        100 * time.Millisecond,
-				Partitioner:         "hash",
-			},
+		Pipelines: []PipelineCfg{},
+	}
+}
+
+// DefaultPipelineConfig 返回单条管道的默认配置模板
+func DefaultPipelineConfig() PipelineCfg {
+	return PipelineCfg{
+		Enabled:    false,
+		Workers:    4,
+		BufferSize: 1024,
+		Source: KafkaConsumerConfig{
+			GroupID:         "xml2json-group",
+			AutoOffsetReset: "latest",
+			MaxPollRecords:  500,
+			FetchMinBytes:   1,
+			FetchMaxBytes:   10 * 1024 * 1024,
+			FetchMaxWait:    5 * time.Second,
+		},
+		Transform: TransformConfig{
+			AttributePrefix: "@",
+			TextKey:         "#text",
+			CDataKey:        "#cdata",
+			NamespaceMode:   "strip",
+			TrimElements:    true,
+			SkipComments:    true,
+			SkipProcInst:    true,
+			StripLevels:     0,
+		},
+		Sink: KafkaProducerConfig{
+			Acks:                1,
+			Compression:         "none",
+			BatchSize:           16384,
+			LingerMs:            10,
+			MaxInFlightRequests: 5,
+			MaxRetries:          3,
+			RetryBackoff:        100 * time.Millisecond,
+			Partitioner:         "hash",
 		},
 	}
 }
@@ -195,27 +198,34 @@ func Load(configPath string) (*AppConfig, error) {
 
 // Validate 校验配置
 func (c *AppConfig) Validate() error {
-	if c.Pipeline.Enabled {
-		if len(c.Pipeline.Source.Brokers) == 0 {
-			return fmt.Errorf("pipeline.source.brokers is required")
+	for i := range c.Pipelines {
+		p := &c.Pipelines[i]
+		if !p.Enabled {
+			continue
 		}
-		if len(c.Pipeline.Source.Topics) == 0 && c.Pipeline.Source.TopicPattern == "" {
-			return fmt.Errorf("pipeline.source.topics or topicPattern is required")
+		if p.ID == "" {
+			return fmt.Errorf("pipelines[%d].id is required when enabled", i)
 		}
-		if c.Pipeline.Source.GroupID == "" {
-			return fmt.Errorf("pipeline.source.groupId is required")
+		if len(p.Source.Brokers) == 0 {
+			return fmt.Errorf("pipelines[%d].source.brokers is required", i)
 		}
-		if len(c.Pipeline.Sink.Brokers) == 0 {
-			return fmt.Errorf("pipeline.sink.brokers is required")
+		if len(p.Source.Topics) == 0 && p.Source.TopicPattern == "" {
+			return fmt.Errorf("pipelines[%d].source.topics or topicPattern is required", i)
 		}
-		if c.Pipeline.Sink.Topic == "" {
-			return fmt.Errorf("pipeline.sink.topic is required")
+		if p.Source.GroupID == "" {
+			return fmt.Errorf("pipelines[%d].source.groupId is required", i)
 		}
-		if c.Pipeline.Workers < 1 {
-			c.Pipeline.Workers = 1
+		if len(p.Sink.Brokers) == 0 {
+			return fmt.Errorf("pipelines[%d].sink.brokers is required", i)
 		}
-		if c.Pipeline.BufferSize < 1 {
-			c.Pipeline.BufferSize = 1024
+		if p.Sink.Topic == "" {
+			return fmt.Errorf("pipelines[%d].sink.topic is required", i)
+		}
+		if p.Workers < 1 {
+			p.Workers = 1
+		}
+		if p.BufferSize < 1 {
+			p.BufferSize = 1024
 		}
 	}
 	return nil

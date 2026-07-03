@@ -20,7 +20,7 @@ import (
 
 // 版本信息，构建时注入
 var (
-	Version   = "0.1.0"
+	Version   = "0.2.0"
 	BuildTime = "unknown"
 )
 
@@ -48,25 +48,42 @@ func main() {
 
 	logger.Info("config loaded",
 		zap.String("server", fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)),
-		zap.Bool("pipeline_enabled", cfg.Pipeline.Enabled),
+		zap.Int("pipeline_count", len(cfg.Pipelines)),
 	)
 
-	// 创建管道
-	p, err := pipeline.New(&cfg.Pipeline, logger)
-	if err != nil {
-		logger.Fatal("failed to create pipeline", zap.Error(err))
-	}
+	// 创建管道管理器
+	mgr := pipeline.NewManager(logger)
 
-	// 如果配置启用，自动启动管道
-	if cfg.Pipeline.Enabled {
-		if err := p.Start(); err != nil {
-			logger.Error("failed to auto-start pipeline", zap.Error(err))
+	// 从配置文件加载管道
+	for i := range cfg.Pipelines {
+		pipeCfg := &cfg.Pipelines[i]
+		if _, err := mgr.Create(pipeCfg); err != nil {
+			logger.Error("failed to create pipeline from config",
+				zap.String("id", pipeCfg.ID),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		// 如果配置启用，自动启动
+		if pipeCfg.Enabled {
+			if err := mgr.Start(pipeCfg.ID); err != nil {
+				logger.Error("failed to auto-start pipeline",
+					zap.String("id", pipeCfg.ID),
+					zap.Error(err),
+				)
+			}
 		}
 	}
 
+	logger.Info("pipelines initialized",
+		zap.Int("total", mgr.Count()),
+		zap.Int("running", mgr.RunningCount()),
+	)
+
 	// 创建 Gin 路由
 	gin.SetMode(gin.ReleaseMode)
-	router := api.NewRouter(p, logger)
+	router := api.NewRouter(mgr, logger)
 
 	// 创建 HTTP 服务器
 	srv := &http.Server{
@@ -86,7 +103,7 @@ func main() {
 
 	logger.Info("xml2json-go started successfully",
 		zap.String("health_url", fmt.Sprintf("http://%s/api/v1/health", srv.Addr)),
-		zap.String("api_url", fmt.Sprintf("http://%s/api/v1/pipeline", srv.Addr)),
+		zap.String("api_url", fmt.Sprintf("http://%s/api/v1/pipelines", srv.Addr)),
 	)
 
 	// 优雅关闭
@@ -96,12 +113,8 @@ func main() {
 
 	logger.Info("shutting down...")
 
-	// 停止管道
-	if p.State() == pipeline.StateRunning {
-		if err := p.Stop(); err != nil {
-			logger.Error("failed to stop pipeline", zap.Error(err))
-		}
-	}
+	// 停止所有管道
+	mgr.StopAll()
 
 	// 关闭 HTTP 服务
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -10,7 +10,7 @@ import (
 )
 
 // NewRouter 创建 Gin 路由
-func NewRouter(p *pipeline.Pipeline, logger *zap.Logger) *gin.Engine {
+func NewRouter(mgr *pipeline.Manager, logger *zap.Logger) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.New()
@@ -22,16 +22,21 @@ func NewRouter(p *pipeline.Pipeline, logger *zap.Logger) *gin.Engine {
 	r.GET("/api/v1/health", handler.Health)
 
 	// 管道 API
-	pipelineHandler := handler.NewPipelineHandler(p, logger)
-	pipelineGroup := r.Group("/api/v1/pipeline")
+	h := handler.NewPipelineHandler(mgr, logger)
+	pipelines := r.Group("/api/v1/pipelines")
 	{
-		pipelineGroup.GET("", pipelineHandler.GetConfig)
-		pipelineGroup.PUT("", pipelineHandler.UpdateConfig)
-		pipelineGroup.POST("/start", pipelineHandler.Start)
-		pipelineGroup.POST("/stop", pipelineHandler.Stop)
-		pipelineGroup.GET("/metrics", pipelineHandler.GetMetrics)
-		pipelineGroup.POST("/preview", pipelineHandler.Preview)
+		pipelines.GET("", h.ListPipelines)        // 列出所有管道
+		pipelines.POST("", h.CreatePipeline)      // 创建新管道
+		pipelines.GET("/:id", h.GetPipeline)      // 获取单个管道
+		pipelines.PUT("/:id", h.UpdatePipeline)   // 更新管道配置
+		pipelines.DELETE("/:id", h.DeletePipeline) // 删除管道
+		pipelines.POST("/:id/start", h.StartPipeline)   // 启动管道
+		pipelines.POST("/:id/stop", h.StopPipeline)     // 停止管道
+		pipelines.GET("/:id/metrics", h.GetPipelineMetrics) // 管道指标
 	}
+
+	// 转换预览（不绑定管道，独立使用）
+	r.POST("/api/v1/preview", h.Preview)
 
 	return r
 }
