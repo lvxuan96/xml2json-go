@@ -21,10 +21,10 @@ pipeline:
     brokers:
       - "localhost:9092"
     topics:
-      - "input.xml"
+      - "test-xml"
     # topicPattern: "xml\..*"   # 也可用正则匹配 topic
     groupId: "xml2json-group"
-    autoOffsetReset: "latest"   # earliest | latest
+    autoOffsetReset: "earliest"   # earliest | latest
     enableAutoCommit: true
     commitInterval: 5s
     sessionTimeout: 10s
@@ -45,12 +45,13 @@ pipeline:
     skipProcInst: true
     strictMode: false          # 严格模式: XML 格式错误时丢弃消息
     errorTopic: ""             # 错误消息投递 topic（空=不投递）
+    stripLevels: 2             # 跳过外层包装层级数: <ROWSET><ROW> 设2则从ROW内部开始转换
 
   # === Kafka 生产端配置 ===
   sink:
     brokers:
       - "localhost:9092"
-    topic: "output.json"
+    topic: "test-json"
     acks: 1                   # 0=不等待 | 1=Leader确认 | -1=所有副本确认
     compression: "none"        # none | gzip | snappy | lz4 | zstd
     batchSize: 16384           # 批量发送字节数

@@ -239,6 +239,50 @@ func TestXML2JSON_NonStrictMode(t *testing.T) {
 	t.Logf("non-strict result: %s", string(jsonData))
 }
 
+func TestXML2JSON_BrokenTagsWithSpaces(t *testing.T) {
+	// 测试预处理：标签名含空格的畸形 XML 自动修复
+	opts := defaultOpts()
+	conv := New(opts, nil)
+
+	xmlData := `<?xml version="1.0" encoding="UTF-8" ?>
+<ROWSET>
+<ROW>
+<order id>12345</order id>
+<customer name>张三</customer name>
+<item>无线鼠标</item>
+</ROW>
+</ROWSET>`
+
+	jsonData, err := conv.Convert([]byte(xmlData))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	t.Logf("fixed result: %s", string(jsonData))
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		t.Fatalf("invalid json output: %v", err)
+	}
+
+	// ROWSET → ROW
+	rowset, ok := result["ROW"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected ROW to be an object, got %T", result["ROW"])
+	}
+
+	// 验证修复后的标签名
+	if rowset["order_id"] != "12345" {
+		t.Errorf("expected order_id=12345, got %v", rowset["order_id"])
+	}
+	if rowset["customer_name"] != "张三" {
+		t.Errorf("expected customer_name=张三, got %v", rowset["customer_name"])
+	}
+	if rowset["item"] != "无线鼠标" {
+		t.Errorf("expected item=无线鼠标, got %v", rowset["item"])
+	}
+}
+
 func assertJSON(t *testing.T, expected, actual string) {
 	t.Helper()
 

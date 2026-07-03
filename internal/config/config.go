@@ -88,6 +88,10 @@ type TransformConfig struct {
 	SkipProcInst    bool   `mapstructure:"skipProcInst"`
 	StrictMode      bool   `mapstructure:"strictMode"`
 	ErrorTopic      string `mapstructure:"errorTopic"`
+	// StripLevels 指定跳过 XML 外层的包装层级数。
+	// 例：XML 为 <ROWSET><ROW><data/></ROW></ROWSET>，设 2 则直接转换 <data/>
+	// 跳过时每层必须只有一个子元素，否则停止并返回当前层级
+	StripLevels int `mapstructure:"stripLevels"`
 }
 
 // PipelineCfg 单条管道配置
@@ -140,6 +144,7 @@ func DefaultConfig() *AppConfig {
 				TrimElements:    true,
 				SkipComments:    true,
 				SkipProcInst:    true,
+				StripLevels:     0, // 默认不跳过，完整转换
 			},
 			Sink: KafkaProducerConfig{
 				Acks:                1,

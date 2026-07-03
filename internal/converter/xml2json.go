@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -45,6 +46,9 @@ type xmlNode struct {
 
 // Convert 将 XML 字节数据转换为 JSON 字节数据
 func (c *XML2JSON) Convert(xmlData []byte) ([]byte, error) {
+	// 预处理：修复常见 XML 格式问题
+	xmlData = preprocessXML(xmlData)
+
 	decoder := xml.NewDecoder(bytes.NewReader(xmlData))
 	decoder.Strict = c.opts.StrictMode
 
@@ -53,16 +57,26 @@ func (c *XML2JSON) Convert(xmlData []byte) ([]byte, error) {
 	var current *xmlNode
 	stack := []*xmlNode{}
 
+	const maxErrors = 50 // 非严格模式下最多容忍的错误数，防止死循环
+	errCount := 0
+
 	for {
 		token, err := decoder.Token()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			if c.opts.StrictMode {
-				return nil, fmt.Errorf("xml decode error: %w", err)
+			errCount++
+			if c.opts.StrictMode || errCount > maxErrors {
+				return nil, fmt.Errorf("xml decode error (err_count=%d): %w", errCount, err)
 			}
-			c.logger.Warn("xml decode error (non-strict, skipping)", zap.Error(err))
+			// 非严格模式：容忍少量错误
+			if c.logger != nil {
+				c.logger.Warn("xml decode error (non-strict, skipping)",
+					zap.Int("err_count", errCount),
+					zap.Error(err),
+				)
+			}
 			continue
 		}
 
@@ -137,7 +151,16 @@ func (c *XML2JSON) Convert(xmlData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("empty xml document or parse error")
 	}
 
-	// 转为 JSON 结构
+	// 按配置跳过外层包装层级
+	// 每层要求有且仅有一个子元素，否则停止
+	for i := 0; i < c.opts.StripLevels; i++ {
+		if len(root.Children) == 1 && root.Text == "" {
+			root = root.Children[0]
+		} else {
+			break // 无法继续跳过
+		}
+	}
+
 	result := c.nodeToJSON(root)
 
 	buf := c.bufPool.Get().(*bytes.Buffer)
@@ -220,4 +243,19 @@ func (c *XML2JSON) Preview(xmlData []byte) (map[string]interface{}, error) {
 		return nil, fmt.Errorf("json unmarshal error: %w", err)
 	}
 	return result, nil
+}
+
+// 匹配"标签名含空格"的非法格式，如 <order id>12345</order id>
+// 关键判断：标签内容中不包含 '=' 号（说明不是合法的属性格式）
+// 捕获组: $1=开始符号(<或</), $2=元素名, $3=空格后的无等号内容
+var brokenTagRe = regexp.MustCompile(`(<\/?)([a-zA-Z_]\w*)\s+([^=>]+?)>`)
+
+// preprocessXML 修复常见的 XML 格式问题：
+// <order id>12345</order id> → <order_id>12345</order_id>
+// 仅当标签内容不含 '=' 时生效，不会误伤 <person name="张三"> 这种合法属性标签
+func preprocessXML(data []byte) []byte {
+	data = brokenTagRe.ReplaceAllFunc(data, func(match []byte) []byte {
+		return []byte(strings.ReplaceAll(string(match), " ", "_"))
+	})
+	return data
 }

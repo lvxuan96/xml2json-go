@@ -1,11 +1,12 @@
 version: "3.2"
 services:
   kafka:
-    image: bitnami/kafka:latest
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/bitnami/kafka:latest
     container_name: kafka
     restart: always
     ports:
-      - "9092:9092"
+      - "9092:9092"   # 外部访问（宿主机 → localhost:9092）
+      - "9094:9094"   # Docker 内部网络（容器间 → kafka:9094）
     environment:
       # 节点ID，单机设为0
       - KAFKA_CFG_NODE_ID=0
@@ -13,16 +14,17 @@ services:
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       # Controller选举配置
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
-      # 监听端口配置
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      # 【重要】外部访问地址，替换为你的本机IP
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://192.168.1.52:9092
+      # 双监听器：外部 PLAINTEXT + 内部 INTERNAL + Controller
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,INTERNAL://:9094,CONTROLLER://:9093
+      # 对外宣告地址：宿主机用 localhost，容器间用 kafka
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:9094
       # 安全协议映射
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
       # 允许自动创建Topic，方便测试
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
@@ -30,4 +32,6 @@ services:
     ports:
       - "9090:8080"
     environment:
-      - DYNAMIC_CONFIG_ENABLED=true
+      # 通过 Docker 内部网络连接 Kafka（使用 INTERNAL 监听器）
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9094

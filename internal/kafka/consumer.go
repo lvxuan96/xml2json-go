@@ -66,9 +66,9 @@ func NewConsumer(
 	saramaCfg.Consumer.Offsets.AutoCommit.Interval = cfg.CommitInterval
 
 	// 拉取配置
-	if cfg.MaxPollRecords > 0 {
-		saramaCfg.Consumer.MaxProcessingTime = time.Duration(cfg.MaxPollRecords) * time.Millisecond
-	}
+	// 注意：MaxProcessingTime 是消费会话的最大处理时间，如果太短会触发 rebalance 导致消息重复
+	// 应设为合理固定值，不应与 MaxPollRecords 混用
+	saramaCfg.Consumer.MaxProcessingTime = 30 * time.Second
 	if cfg.FetchMinBytes > 0 {
 		saramaCfg.Consumer.Fetch.Min = cfg.FetchMinBytes
 	}
@@ -132,7 +132,11 @@ func (c *Consumer) Run(ctx context.Context) error {
 				return nil // 正常取消
 			}
 			c.logger.Error("consume error, retrying...", zap.Error(err))
-			time.Sleep(time.Second)
+			select {
+			case <-time.After(time.Second):
+			case <-ctx.Done():
+				return nil
+			}
 			continue
 		}
 
