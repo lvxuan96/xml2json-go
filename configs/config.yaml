@@ -1,92 +1,102 @@
-# xml2json-go 配置文件 v0.2
-# 支持多管道并行运行
-# 环境变量覆盖: 如 SERVER_PORT=9090 可覆盖 server.port
-
 server:
-  host: "0.0.0.0"
-  port: 8080
-  readTimeout: 30s
-  writeTimeout: 30s
-
-# 多管道配置列表（可配置任意数量的管道）
+    host: 0.0.0.0
+    port: 8080
+    readTimeout: 30s
+    writeTimeout: 30s
 pipelines:
-  - id: "order-pipeline"
-    name: "订单数据转换"
-    description: "消费订单XML，转为JSON输出"
-    enabled: false          # 启动时是否自动运行
-    workers: 4
-    bufferSize: 1024
-
-    source:                 # === Kafka 消费端 ===
-      brokers:
-        - "localhost:9092"
-      topics:
-        - "test-xml"
-      groupId: "xml2json-order-group"
-      autoOffsetReset: "earliest"
-      enableAutoCommit: true
-      commitInterval: 5s
-      sessionTimeout: 10s
-      heartbeatInterval: 3s
-      maxPollRecords: 500
-      fetchMinBytes: 1
-      fetchMaxBytes: 10485760
-      fetchMaxWait: 5s
-
-    transform:              # === 转换规则 ===
-      attributePrefix: "@"
-      textKey: "#text"
-      cdataKey: "#cdata"
-      namespaceMode: "strip"
-      trimElements: true
-      skipComments: true
-      skipProcInst: true
-      strictMode: false
-      errorTopic: ""
-      stripLevels: 2         # 跳过 <ROWSET><ROW> 外层
-
-    sink:                   # === Kafka 生产端 ===
-      brokers:
-        - "localhost:9092"
-      topic: "test-json"
-      acks: 1
-      compression: "none"
-      batchSize: 16384
-      lingerMs: 10
-      maxInFlightRequests: 5
-      idempotent: false
-      maxRetries: 3
-      retryBackoff: 100ms
-      partitioner: "hash"
-      partitionKeyField: ""
-
-  # 示例：第二条管道（取消注释即可启用）
-  - id: "user-pipeline"
-    name: "用户数据转换"
-    description: "消费用户XML，转为JSON输出"
-    enabled: false
-    workers: 4
-    bufferSize: 1024
-    source:
-      brokers:
-        - "localhost:9092"
-      topics:
-        - "user-xml"
-      groupId: "xml2json-user-group"
-      autoOffsetReset: "latest"
-      enableAutoCommit: true
-      commitInterval: 5s
-      sessionTimeout: 10s
-      heartbeatInterval: 3s
-      maxPollRecords: 500
-    transform:
-      attributePrefix: "@"
-      textKey: "#text"
-      namespaceMode: "strip"
-      stripLevels: 0
-    sink:
-      brokers:
-        - "localhost:9092"
-      topic: "user-json"
-      acks: 1
-      compression: "zstd"
+    - id: order-pipeline
+      name: 测试数据转换
+      description: 消费订单XML，转为JSON输出
+      enabled: false
+      workers: 4
+      bufferSize: 1024
+      source:
+        brokers: ['localhost:9092']
+        topics: [test-xml]
+        topicPattern: ""
+        groupId: xml2json-order-group
+        autoOffsetReset: earliest
+        enableAutoCommit: true
+        commitInterval: 5s
+        sessionTimeout: 10s
+        heartbeatInterval: 3s
+        maxPollRecords: 500
+        fetchMinBytes: 0
+        fetchMaxBytes: 0
+        fetchMaxWait: 0s
+        sasl: null
+        tls: null
+      transform:
+        attributePrefix: '@'
+        textKey: '#text'
+        cdataKey: ""
+        namespaceMode: strip
+        trimElements: true
+        skipComments: true
+        skipProcInst: true
+        strictMode: false
+        errorTopic: ""
+        stripLevels: 2
+      sink:
+        brokers: ['localhost:9092']
+        topic: test-json
+        acks: 1
+        compression: none
+        batchSize: 16384
+        lingerMs: 10
+        maxInFlightRequests: 5
+        idempotent: false
+        maxRetries: 3
+        retryBackoff: 100ms
+        partitioner: hash
+        partitionKeyField: ""
+        sasl: null
+        tls: null
+    - id: user-pipeline
+      name: 用户数据转换
+      description: 消费用户XML，转为JSON输出
+      enabled: false
+      workers: 4
+      bufferSize: 1024
+      source:
+        brokers: ['localhost:9092']
+        topics: [user-xml]
+        topicPattern: ""
+        groupId: xml2json-user-group
+        autoOffsetReset: latest
+        enableAutoCommit: true
+        commitInterval: 5s
+        sessionTimeout: 10s
+        heartbeatInterval: 3s
+        maxPollRecords: 500
+        fetchMinBytes: 0
+        fetchMaxBytes: 0
+        fetchMaxWait: 0s
+        sasl: null
+        tls: null
+      transform:
+        attributePrefix: '@'
+        textKey: '#text'
+        cdataKey: ""
+        namespaceMode: strip
+        trimElements: false
+        skipComments: false
+        skipProcInst: false
+        strictMode: false
+        errorTopic: ""
+        stripLevels: 0
+      sink:
+        brokers: ['localhost:9092']
+        topic: user-json
+        acks: 1
+        compression: zstd
+        batchSize: 0
+        lingerMs: 0
+        maxInFlightRequests: 0
+        idempotent: false
+        maxRetries: 0
+        retryBackoff: 0s
+        partitioner: ""
+        partitionKeyField: ""
+        sasl: null
+        tls: null

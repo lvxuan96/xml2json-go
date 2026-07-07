@@ -11,9 +11,9 @@ import (
 
 // PipelineStatus 管道的完整状态信息
 type PipelineStatus struct {
-	Config  PipelineCfg  `json:"config"`
-	Metrics Metrics      `json:"metrics"`
-	State   string       `json:"state"`
+	Config  PipelineCfg `json:"config"`
+	Metrics Metrics     `json:"metrics"`
+	State   string      `json:"state"`
 }
 
 // PipelineCfg 重新导出 config.PipelineCfg（避免 api 层直接依赖 config）
@@ -21,38 +21,46 @@ type PipelineCfg = config.PipelineCfg
 
 // Manager 管道管理器，管理多条管道的生命周期
 type Manager struct {
-	mu        sync.RWMutex
-	pipelines map[string]*Pipeline
-	logger    *zap.Logger
+	mu         sync.RWMutex
+	pipelines  map[string]*Pipeline
+	configPath string
+	logger     *zap.Logger
 }
 
 // NewManager 创建管道管理器
-func NewManager(logger *zap.Logger) *Manager {
+// configPath: 配置文件路径，用于持久化（空字符串表示不持久化）
+func NewManager(configPath string, logger *zap.Logger) *Manager {
 	return &Manager{
-		pipelines: make(map[string]*Pipeline),
-		logger:    logger,
+		pipelines:  make(map[string]*Pipeline),
+		configPath: configPath,
+		logger:     logger,
 	}
 }
 
 // Create 创建一条新管道（不启动）
 func (m *Manager) Create(cfg *PipelineCfg) (*Pipeline, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	if cfg.ID == "" {
+		m.mu.Unlock()
 		return nil, fmt.Errorf("pipeline id is required")
 	}
 	if _, exists := m.pipelines[cfg.ID]; exists {
+		m.mu.Unlock()
 		return nil, fmt.Errorf("pipeline '%s' already exists", cfg.ID)
 	}
 
 	p, err := New(cfg, m.logger)
 	if err != nil {
+		m.mu.Unlock()
 		return nil, fmt.Errorf("failed to create pipeline '%s': %w", cfg.ID, err)
 	}
 
 	m.pipelines[cfg.ID] = p
+	m.mu.Unlock() // 必须在 save() 之前释放，save() 内部需要 RLock
+
 	m.logger.Info("pipeline created", zap.String("id", cfg.ID), zap.String("name", cfg.Name))
+	m.save()
 	return p, nil
 }
 
@@ -113,6 +121,8 @@ func (m *Manager) Delete(id string) error {
 	m.mu.Unlock()
 
 	m.logger.Info("pipeline deleted", zap.String("id", id))
+
+	m.save()
 	return nil
 }
 
@@ -129,6 +139,8 @@ func (m *Manager) Reload(id string, cfg *PipelineCfg) error {
 	}
 
 	m.logger.Info("pipeline reloaded", zap.String("id", id))
+
+	m.save()
 	return nil
 }
 
@@ -213,4 +225,27 @@ func (m *Manager) get(id string) (*Pipeline, error) {
 		return nil, fmt.Errorf("pipeline '%s' not found", id)
 	}
 	return p, nil
+}
+
+// save 将当前所有管道配置持久化到 YAML 文件
+func (m *Manager) save() {
+	if m.configPath == "" {
+		return
+	}
+
+	m.mu.RLock()
+	pipes := make([]PipelineCfg, 0, len(m.pipelines))
+	for _, p := range m.pipelines {
+		pipes = append(pipes, *p.GetConfig())
+	}
+	m.mu.RUnlock()
+
+	cfg := config.DefaultConfig()
+	cfg.Pipelines = pipes
+
+	if err := config.Save(m.configPath, cfg); err != nil {
+		m.logger.Error("failed to persist config", zap.Error(err))
+	} else {
+		m.logger.Info("config persisted", zap.Int("pipeline_count", len(pipes)))
+	}
 }

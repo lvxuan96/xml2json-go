@@ -56,7 +56,7 @@ func main() {
 	)
 
 	// 创建管道管理器
-	mgr := pipeline.NewManager(logger)
+	mgr := pipeline.NewManager(configPath, logger)
 
 	// 从配置文件加载管道
 	for i := range cfg.Pipelines {

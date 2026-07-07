@@ -3,11 +3,13 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Duration 可解析字符串的时间间隔，同时兼容 JSON 字符串（"5s"）和整数（纳秒）
@@ -64,23 +66,23 @@ func (d Duration) ToStd() time.Duration {
 
 // ServerConfig HTTP 服务配置
 type ServerConfig struct {
-	Host         string        `json:"host" mapstructure:"host"`
-	Port         int           `json:"port" mapstructure:"port"`
-	ReadTimeout  time.Duration `json:"readTimeout" mapstructure:"readTimeout"`
-	WriteTimeout time.Duration `json:"writeTimeout" mapstructure:"writeTimeout"`
+	Host         string        `json:"host" mapstructure:"host" yaml:"host"`
+	Port         int           `json:"port" mapstructure:"port" yaml:"port"`
+	ReadTimeout  time.Duration `json:"readTimeout" mapstructure:"readTimeout" yaml:"readTimeout"`
+	WriteTimeout time.Duration `json:"writeTimeout" mapstructure:"writeTimeout" yaml:"writeTimeout"`
 }
 
 // KafkaConfig Kafka 通用连接配置
 type KafkaConfig struct {
-	Brokers []string `json:"brokers" mapstructure:"brokers"`
-	Topic   string   `json:"topic" mapstructure:"topic"`
+	Brokers []string `json:"brokers" mapstructure:"brokers" yaml:"brokers,flow"`
+	Topic   string   `json:"topic" mapstructure:"topic" yaml:"topic"`
 	SASL    *SASL    `json:"sasl,omitempty" mapstructure:"sasl,omitempty"`
 	TLS     *TLS     `json:"tls,omitempty" mapstructure:"tls,omitempty"`
 }
 
 // SASL SASL 认证配置
 type SASL struct {
-	Enabled   bool   `json:"enabled" mapstructure:"enabled"`
+	Enabled   bool   `json:"enabled" mapstructure:"enabled" yaml:"enabled"`
 	Mechanism string `json:"mechanism" mapstructure:"mechanism"`
 	Username  string `json:"username" mapstructure:"username"`
 	Password  string `json:"password" mapstructure:"password"`
@@ -88,7 +90,7 @@ type SASL struct {
 
 // TLS TLS 配置
 type TLS struct {
-	Enabled    bool   `json:"enabled" mapstructure:"enabled"`
+	Enabled    bool   `json:"enabled" mapstructure:"enabled" yaml:"enabled"`
 	CAFile     string `json:"caFile" mapstructure:"caFile"`
 	CertFile   string `json:"certFile" mapstructure:"certFile"`
 	KeyFile    string `json:"keyFile" mapstructure:"keyFile"`
@@ -97,72 +99,72 @@ type TLS struct {
 
 // KafkaConsumerConfig 消费者配置
 type KafkaConsumerConfig struct {
-	Brokers           []string `json:"brokers" mapstructure:"brokers"`
-	Topics            []string `json:"topics" mapstructure:"topics"`
-	TopicPattern      string   `json:"topicPattern" mapstructure:"topicPattern"`
-	GroupID           string   `json:"groupId" mapstructure:"groupId"`
-	AutoOffsetReset   string   `json:"autoOffsetReset" mapstructure:"autoOffsetReset"`
-	EnableAutoCommit  bool     `json:"enableAutoCommit" mapstructure:"enableAutoCommit"`
-	CommitInterval    Duration `json:"commitInterval" mapstructure:"commitInterval"`
-	SessionTimeout    Duration `json:"sessionTimeout" mapstructure:"sessionTimeout"`
-	HeartbeatInterval Duration `json:"heartbeatInterval" mapstructure:"heartbeatInterval"`
-	MaxPollRecords    int      `json:"maxPollRecords" mapstructure:"maxPollRecords"`
-	FetchMinBytes     int32    `json:"fetchMinBytes" mapstructure:"fetchMinBytes"`
-	FetchMaxBytes     int32    `json:"fetchMaxBytes" mapstructure:"fetchMaxBytes"`
-	FetchMaxWait      Duration `json:"fetchMaxWait" mapstructure:"fetchMaxWait"`
+	Brokers           []string `json:"brokers" mapstructure:"brokers" yaml:"brokers,flow"`
+	Topics            []string `json:"topics" mapstructure:"topics" yaml:"topics,flow"`
+	TopicPattern      string   `json:"topicPattern" mapstructure:"topicPattern" yaml:"topicPattern"`
+	GroupID           string   `json:"groupId" mapstructure:"groupId" yaml:"groupId"`
+	AutoOffsetReset   string   `json:"autoOffsetReset" mapstructure:"autoOffsetReset" yaml:"autoOffsetReset"`
+	EnableAutoCommit  bool     `json:"enableAutoCommit" mapstructure:"enableAutoCommit" yaml:"enableAutoCommit"`
+	CommitInterval    Duration `json:"commitInterval" mapstructure:"commitInterval" yaml:"commitInterval"`
+	SessionTimeout    Duration `json:"sessionTimeout" mapstructure:"sessionTimeout" yaml:"sessionTimeout"`
+	HeartbeatInterval Duration `json:"heartbeatInterval" mapstructure:"heartbeatInterval" yaml:"heartbeatInterval"`
+	MaxPollRecords    int      `json:"maxPollRecords" mapstructure:"maxPollRecords" yaml:"maxPollRecords"`
+	FetchMinBytes     int32    `json:"fetchMinBytes" mapstructure:"fetchMinBytes" yaml:"fetchMinBytes"`
+	FetchMaxBytes     int32    `json:"fetchMaxBytes" mapstructure:"fetchMaxBytes" yaml:"fetchMaxBytes"`
+	FetchMaxWait      Duration `json:"fetchMaxWait" mapstructure:"fetchMaxWait" yaml:"fetchMaxWait"`
 	SASL              *SASL    `json:"sasl,omitempty" mapstructure:"sasl,omitempty"`
 	TLS               *TLS     `json:"tls,omitempty" mapstructure:"tls,omitempty"`
 }
 
 // KafkaProducerConfig 生产者配置
 type KafkaProducerConfig struct {
-	Brokers             []string `json:"brokers" mapstructure:"brokers"`
-	Topic               string   `json:"topic" mapstructure:"topic"`
-	Acks                int16    `json:"acks" mapstructure:"acks"`
-	Compression         string   `json:"compression" mapstructure:"compression"`
-	BatchSize           int      `json:"batchSize" mapstructure:"batchSize"`
-	LingerMs            int      `json:"lingerMs" mapstructure:"lingerMs"`
-	MaxInFlightRequests int      `json:"maxInFlightRequests" mapstructure:"maxInFlightRequests"`
-	Idempotent          bool     `json:"idempotent" mapstructure:"idempotent"`
-	MaxRetries          int      `json:"maxRetries" mapstructure:"maxRetries"`
-	RetryBackoff        Duration `json:"retryBackoff" mapstructure:"retryBackoff"`
-	Partitioner         string   `json:"partitioner" mapstructure:"partitioner"`
-	PartitionKeyField   string   `json:"partitionKeyField" mapstructure:"partitionKeyField"`
+	Brokers             []string `json:"brokers" mapstructure:"brokers" yaml:"brokers,flow"`
+	Topic               string   `json:"topic" mapstructure:"topic" yaml:"topic"`
+	Acks                int16    `json:"acks" mapstructure:"acks" yaml:"acks"`
+	Compression         string   `json:"compression" mapstructure:"compression" yaml:"compression"`
+	BatchSize           int      `json:"batchSize" mapstructure:"batchSize" yaml:"batchSize"`
+	LingerMs            int      `json:"lingerMs" mapstructure:"lingerMs" yaml:"lingerMs"`
+	MaxInFlightRequests int      `json:"maxInFlightRequests" mapstructure:"maxInFlightRequests" yaml:"maxInFlightRequests"`
+	Idempotent          bool     `json:"idempotent" mapstructure:"idempotent" yaml:"idempotent"`
+	MaxRetries          int      `json:"maxRetries" mapstructure:"maxRetries" yaml:"maxRetries"`
+	RetryBackoff        Duration `json:"retryBackoff" mapstructure:"retryBackoff" yaml:"retryBackoff"`
+	Partitioner         string   `json:"partitioner" mapstructure:"partitioner" yaml:"partitioner"`
+	PartitionKeyField   string   `json:"partitionKeyField" mapstructure:"partitionKeyField" yaml:"partitionKeyField"`
 	SASL                *SASL    `json:"sasl,omitempty" mapstructure:"sasl,omitempty"`
 	TLS                 *TLS     `json:"tls,omitempty" mapstructure:"tls,omitempty"`
 }
 
 // TransformConfig 转换配置
 type TransformConfig struct {
-	AttributePrefix string `json:"attributePrefix" mapstructure:"attributePrefix"`
-	TextKey         string `json:"textKey" mapstructure:"textKey"`
-	CDataKey        string `json:"cdataKey" mapstructure:"cdataKey"`
-	NamespaceMode   string `json:"namespaceMode" mapstructure:"namespaceMode"`
-	TrimElements    bool   `json:"trimElements" mapstructure:"trimElements"`
-	SkipComments    bool   `json:"skipComments" mapstructure:"skipComments"`
-	SkipProcInst    bool   `json:"skipProcInst" mapstructure:"skipProcInst"`
-	StrictMode      bool   `json:"strictMode" mapstructure:"strictMode"`
-	ErrorTopic      string `json:"errorTopic" mapstructure:"errorTopic"`
-	StripLevels     int    `json:"stripLevels" mapstructure:"stripLevels"`
+	AttributePrefix string `json:"attributePrefix" mapstructure:"attributePrefix" yaml:"attributePrefix"`
+	TextKey         string `json:"textKey" mapstructure:"textKey" yaml:"textKey"`
+	CDataKey        string `json:"cdataKey" mapstructure:"cdataKey" yaml:"cdataKey"`
+	NamespaceMode   string `json:"namespaceMode" mapstructure:"namespaceMode" yaml:"namespaceMode"`
+	TrimElements    bool   `json:"trimElements" mapstructure:"trimElements" yaml:"trimElements"`
+	SkipComments    bool   `json:"skipComments" mapstructure:"skipComments" yaml:"skipComments"`
+	SkipProcInst    bool   `json:"skipProcInst" mapstructure:"skipProcInst" yaml:"skipProcInst"`
+	StrictMode      bool   `json:"strictMode" mapstructure:"strictMode" yaml:"strictMode"`
+	ErrorTopic      string `json:"errorTopic" mapstructure:"errorTopic" yaml:"errorTopic"`
+	StripLevels     int    `json:"stripLevels" mapstructure:"stripLevels" yaml:"stripLevels"`
 }
 
 // PipelineCfg 单条管道配置
 type PipelineCfg struct {
-	ID          string              `json:"id" mapstructure:"id"`
-	Name        string              `json:"name" mapstructure:"name"`
-	Description string              `json:"description" mapstructure:"description"`
-	Enabled     bool                `json:"enabled" mapstructure:"enabled"`
-	Workers     int                 `json:"workers" mapstructure:"workers"`
-	BufferSize  int                 `json:"bufferSize" mapstructure:"bufferSize"`
-	Source      KafkaConsumerConfig `json:"source" mapstructure:"source"`
-	Transform   TransformConfig     `json:"transform" mapstructure:"transform"`
-	Sink        KafkaProducerConfig `json:"sink" mapstructure:"sink"`
+	ID          string              `json:"id" mapstructure:"id" yaml:"id"`
+	Name        string              `json:"name" mapstructure:"name" yaml:"name"`
+	Description string              `json:"description" mapstructure:"description" yaml:"description"`
+	Enabled     bool                `json:"enabled" mapstructure:"enabled" yaml:"enabled"`
+	Workers     int                 `json:"workers" mapstructure:"workers" yaml:"workers"`
+	BufferSize  int                 `json:"bufferSize" mapstructure:"bufferSize" yaml:"bufferSize"`
+	Source      KafkaConsumerConfig `json:"source" mapstructure:"source" yaml:"source"`
+	Transform   TransformConfig     `json:"transform" mapstructure:"transform" yaml:"transform"`
+	Sink        KafkaProducerConfig `json:"sink" mapstructure:"sink" yaml:"sink"`
 }
 
 // AppConfig 应用总配置
 type AppConfig struct {
-	Server    ServerConfig  `json:"server" mapstructure:"server"`
-	Pipelines []PipelineCfg `json:"pipelines" mapstructure:"pipelines"`
+	Server    ServerConfig  `json:"server" mapstructure:"server" yaml:"server"`
+	Pipelines []PipelineCfg `json:"pipelines" mapstructure:"pipelines" yaml:"pipelines"`
 }
 
 // DefaultConfig 返回带默认值的配置
@@ -253,6 +255,27 @@ func Load(configPath string) (*AppConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+// Save 将配置写回 YAML 文件（持久化页面操作）
+func Save(path string, cfg *AppConfig) error {
+	tmpPath := path + ".tmp"
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	// Windows 上 os.Rename 无法覆盖已存在的文件，需要先删除
+	_ = os.Remove(path)
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("failed to rename config: %w", err)
+	}
+	return nil
 }
 
 // durationDecodeHook 将 YAML 中的字符串转为 Duration 类型
